@@ -5,8 +5,59 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Version](https://img.shields.io/badge/version-2.4.0-green.svg)](#changelog)
 [![WEEX API](https://img.shields.io/badge/WEEX-V3_API-orange.svg)](https://www.weex.com)
+[![Safety](https://img.shields.io/badge/Trade_Safety-Proof_Token-red.svg)](#-innovation-1-proof-token-trade-safety)
 
 Trade futures & spot on WEEX exchange, analyze crypto markets, and manage your portfolio — all through natural language in your AI coding agent.
+
+> **Fork of [drgnchan/weex-trader-skill](https://github.com/drgnchan/weex-trader-skill)** — enhanced with proof-token trade safety, multi-source market analysis, and anti-hallucination agent engineering.
+
+---
+
+## 🆕 What's Different in This Fork?
+
+This fork solves **three real problems** discovered during production use of the original skill:
+
+### 🔒 Innovation 1: Proof Token Trade Safety
+
+**Problem:** AI agents can skip `--dry-run` and execute `--confirm-live` directly — no code-level enforcement existed. In testing, the agent placed a real $100 trade without asking for confirmation.
+
+**Solution:** A **SHA-256 proof token mechanism** baked into the script itself:
+
+```
+  --dry-run  →  generates proof token (SHA-256 of order params)
+                token saved to temp dir, 5-min TTL, single-use
+                    │
+          user confirms ("yes" / "go ahead")
+                    │
+  --confirm-live  →  script checks for matching token
+                     ❌ no token / expired / wrong params → ORDER REJECTED
+                     ✅ valid token → execute, then delete token
+```
+
+**This is not a prompt-level rule — it's code-level enforcement.** Even if an agent ignores SKILL.md instructions, the Python script will refuse to place the order. No token, no trade. Period.
+
+### 🧠 Innovation 2: Anti-Hallucination Agent Engineering
+
+**Problem:** AI agents hallucinate subcommands (`account` instead of `balance`), wrong flags (`--type` instead of `--order-type`), and fabricated endpoint names (`account.get_account_info`).
+
+**Solution:**
+- **13 shortcut commands** embedded directly in the SKILL.md `description` field — agents copy-paste, no room for invention
+- **8-entry common mistakes table** with wrong → correct mapping
+- **Hard constraints** at the top of SKILL.md: "EXACTLY 3 scripts. No MCP servers. No imaginary tools."
+- Parameter name differences called out explicitly: Spot = `--order-type`, Futures = `--type`
+
+### 🌐 Innovation 3: Multi-Source Market Intelligence
+
+**Problem:** The original skill only queries WEEX exchange data. No way to check Fear & Greed, DeFi TVL, meme coin rankings, RSI, or gas fees.
+
+**Solution:** `crypto.sh` — a 15-command CLI that aggregates 4 data sources with clear priority rules:
+
+| Priority | Source | Data |
+|----------|--------|------|
+| 🥇 Primary | **WEEX API** | Prices, depth, klines, funding, positions, orders |
+| 🥈 Supplementary | CoinGecko | Trending, meme ranking, coin info, price comparison |
+| 🥈 Supplementary | DefiLlama | DeFi TVL, yield data |
+| 🥈 Supplementary | Alternative.me | Fear & Greed Index |
 
 ---
 
@@ -18,7 +69,7 @@ Trade futures & spot on WEEX exchange, analyze crypto markets, and manage your p
 | **📈 Futures Trading** | Long/Short positions, leverage, funding rates, position management |
 | **📊 Market Data** | Tickers, K-lines, order book depth, 24h stats, open interest |
 | **🧠 Market Analysis** | Fear & Greed Index, RSI, Moving Averages, DeFi TVL, trending coins |
-| **🔒 Safety System** | Code-enforced two-step verification with proof tokens for all trades |
+| **🔒 Proof Token Safety** | Code-enforced two-step verification — agents can't bypass it |
 | **🌐 Multi-Source** | WEEX (primary) + CoinGecko + DefiLlama + Alternative.me |
 
 ## 🚀 Quick Start
@@ -97,7 +148,7 @@ python $S/weex_contract_api.py open-interest --symbol BTCUSDT --pretty
 python $S/weex_contract_api.py trades --symbol BTCUSDT --limit 50 --pretty
 ```
 
-### Market Analysis (`crypto.sh`)
+### Market Analysis (`crypto.sh`) — *New in this fork*
 
 ```bash
 bash $S/crypto.sh fear                        # Fear & Greed Index
@@ -118,7 +169,7 @@ bash $S/crypto.sh compare bitcoin ethereum    # Compare coins
 
 ---
 
-## 🔒 Safety: Two-Step Trade Verification
+## 🔒 Safety: Two-Step Trade Verification — *New in this fork*
 
 All trading operations are **code-enforced** with a proof token mechanism. Even if the AI agent tries to skip the safety check, the script itself will reject the order.
 
@@ -185,9 +236,9 @@ weex-trader-skill/
 ├── .env                      # API credentials (git-ignored)
 ├── .gitignore
 ├── scripts/
-│   ├── weex_spot_api.py      # Spot REST API client
-│   ├── weex_contract_api.py  # Futures REST API client
-│   ├── crypto.sh             # Market analysis CLI (multi-source)
+│   ├── weex_spot_api.py      # Spot REST API client (+ proof token)
+│   ├── weex_contract_api.py  # Futures REST API client (+ proof token)
+│   ├── crypto.sh             # Market analysis CLI (multi-source) ← NEW
 │   ├── generate_weex_api_definitions.py  # API definition generator
 │   └── skill_update.py       # Self-update tool
 ├── references/
@@ -200,7 +251,7 @@ weex-trader-skill/
 │   ├── auth-and-signing.md           # Authentication guide
 │   ├── websocket.md                  # WebSocket reference
 │   └── updates.md
-└── docs/
+└── docs/                             ← NEW
     ├── guide.md              # Beginner's guide (新手入门)
     ├── strategies.md         # Investment strategies (投资策略)
     ├── tips.md               # Quick tips (技巧速查)
@@ -288,21 +339,22 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 
 ## 📜 Changelog
 
-### v2.4.0 (2026-03-27)
+### v2.4.0 (2026-03-27) — Proof Token Safety
 - 🔒 **Code-enforced two-step trade verification** with proof tokens (SHA-256 fingerprint)
 - Scripts reject `--confirm-live` without prior `--dry-run` at code level
 - Proof tokens: single-use, 5-minute TTL, tamper-proof
 
-### v2.3.0
-- 📝 Replaced `call --endpoint` with 13 shortcut commands in SKILL.md description
-- ⚠️ Added common mistakes reference table (8 frequent errors)
+### v2.3.0 — Anti-Hallucination
+- 🧠 Replaced `call --endpoint` with 13 shortcut commands in SKILL.md description
+- ⚠️ Added common mistakes reference table (8 frequent agent errors)
 - 🛡️ Introduced `--dry-run` → user confirm → `--confirm-live` safety flow
 
-### v2.2.0
+### v2.2.0 — Multi-Source Intelligence
 - 🌐 Added `crypto.sh` for multi-source market analysis (CoinGecko, DefiLlama, Alternative.me)
 - 📊 RSI, Moving Averages, DeFi TVL, Fear & Greed, Gas tracker
+- 📖 Added `docs/`: beginner guide, investment strategies, quick tips
 
-### v1.6.0
+### v1.6.0 — *Original by drgnchan*
 - ✅ WEEX V3 API support (spot + futures)
 - 📦 Self-update system via GitHub Releases
 
@@ -320,5 +372,5 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 
 <p align="center">
   Built with ❤️ for the crypto trading community<br>
-  <strong>WEEX Trader Skill</strong> — Trade smarter with AI
+  <strong>WEEX Trader Skill</strong> — Trade smarter, trade safer
 </p>
