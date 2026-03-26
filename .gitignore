@@ -1,2 +1,9 @@
 __pycache__/
 *.pyc
+.env
+
+# Local subproject copies (not part of skill)
+WEEX API/
+crypto tracker/
+crypto-market-data-1.0.2/
+/TEST_REPORT.md

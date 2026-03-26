@@ -15,6 +15,7 @@ import hmac
 import json
 import os
 import secrets
+import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -24,6 +25,40 @@ from urllib import error, parse, request
 DEFAULT_BASE_URL = "https://api-spot.weex.com"
 DEFAULT_LOCALE = "en-US"
 DEFAULT_TIMEOUT = 15.0
+
+
+def _load_dotenv() -> None:
+    """Auto-load .env file if present. Resolution order:
+    1. $HOME/.claude/skills/weex-trader/.env  (user-level)
+    2. .claude/skills/weex-trader/.env         (project-level, relative to cwd)
+    3. .env                                    (current directory)
+    Only sets vars that are NOT already in the environment (no overwrite).
+    """
+    candidates = [
+        Path.home() / ".claude" / "skills" / "weex-trader" / ".env",
+        Path(".claude") / "skills" / "weex-trader" / ".env",
+        Path(".env"),
+    ]
+    for env_path in candidates:
+        try:
+            env_path = env_path.resolve()
+            if env_path.is_file():
+                with open(env_path, encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line or line.startswith("#") or "=" not in line:
+                            continue
+                        key, _, value = line.partition("=")
+                        key = key.strip()
+                        value = value.strip().strip("'\"")
+                        if key and key not in os.environ:
+                            os.environ[key] = value
+                return  # stop at first found
+        except (OSError, PermissionError):
+            continue
+
+
+_load_dotenv()
 
 
 @dataclass(frozen=True)
@@ -225,6 +260,96 @@ def is_mutating(endpoint: Endpoint) -> bool:
     return endpoint.method in {"POST", "PUT", "DELETE"} and endpoint.requires_auth
 
 
+# ── Proof-token enforcement: --confirm-live requires prior --dry-run ──
+
+_PROOF_TOKEN_DIR = Path(tempfile.gettempdir()) / "weex_trader"
+_PROOF_TOKEN_TTL = 300  # seconds (5 minutes)
+
+# Fields excluded from fingerprint because they change between invocations
+_FINGERPRINT_EXCLUDE_KEYS = {"newClientOrderId"}
+
+
+def _proof_fingerprint(endpoint_key: str, query: Dict[str, Any], body: Dict[str, Any]) -> str:
+    """Deterministic SHA-256 fingerprint of endpoint + parameters."""
+    clean_body = {k: v for k, v in body.items() if k not in _FINGERPRINT_EXCLUDE_KEYS}
+    canonical = json.dumps(
+        {"endpoint": endpoint_key, "query": query, "body": clean_body},
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=True,
+    )
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+
+
+def _write_proof_token(endpoint_key: str, query: Dict[str, Any], body: Dict[str, Any]) -> str:
+    """Write a proof token after a successful --dry-run. Returns the token file path."""
+    _PROOF_TOKEN_DIR.mkdir(parents=True, exist_ok=True)
+    fp = _proof_fingerprint(endpoint_key, query, body)
+    token_path = _PROOF_TOKEN_DIR / f"{fp}.token"
+    payload = json.dumps({
+        "endpoint": endpoint_key,
+        "fingerprint": fp,
+        "created": time.time(),
+    }, ensure_ascii=True)
+    token_path.write_text(payload, encoding="utf-8")
+    return str(token_path)
+
+
+def _require_proof_token(endpoint_key: str, query: Dict[str, Any], body: Dict[str, Any]) -> Path:
+    """Validate a matching, non-expired proof token exists. Returns path for later deletion.
+    Raises SystemExit if missing, expired, or corrupted.
+    """
+    fp = _proof_fingerprint(endpoint_key, query, body)
+    token_path = _PROOF_TOKEN_DIR / f"{fp}.token"
+
+    _cleanup_expired_tokens()
+
+    if not token_path.is_file():
+        raise SystemExit(
+            f"⛔ BLOCKED: No dry-run proof token found for {endpoint_key}.\n"
+            f"You MUST run --dry-run with the same parameters before --confirm-live.\n"
+            f"Expected token: {token_path}"
+        )
+    try:
+        data = json.loads(token_path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError) as exc:
+        token_path.unlink(missing_ok=True)
+        raise SystemExit(
+            f"⛔ BLOCKED: Proof token for {endpoint_key} is corrupted and was removed. "
+            f"Re-run --dry-run first. Detail: {exc}"
+        ) from exc
+
+    created = data.get("created", 0)
+    age = time.time() - created
+    if age > _PROOF_TOKEN_TTL:
+        token_path.unlink(missing_ok=True)
+        raise SystemExit(
+            f"⛔ BLOCKED: Proof token for {endpoint_key} expired ({int(age)}s > {_PROOF_TOKEN_TTL}s TTL). "
+            f"Re-run --dry-run to generate a fresh token."
+        )
+    return token_path
+
+
+def _cleanup_expired_tokens() -> None:
+    """Remove any .token files older than TTL. Best-effort, never raises."""
+    try:
+        if not _PROOF_TOKEN_DIR.is_dir():
+            return
+        now = time.time()
+        for f in _PROOF_TOKEN_DIR.glob("*.token"):
+            try:
+                data = json.loads(f.read_text(encoding="utf-8"))
+                if now - data.get("created", 0) > _PROOF_TOKEN_TTL:
+                    f.unlink(missing_ok=True)
+            except (json.JSONDecodeError, OSError, KeyError):
+                try:
+                    f.unlink(missing_ok=True)
+                except OSError:
+                    pass
+    except OSError:
+        pass
+
+
 def execute_endpoint(
     client: WeexSpotClient,
     endpoint_key: str,
@@ -235,8 +360,9 @@ def execute_endpoint(
     pretty: bool,
 ) -> int:
     endpoint = ENDPOINTS[endpoint_key]
+    mutating = is_mutating(endpoint)
 
-    if is_mutating(endpoint) and not confirm_live and not dry_run:
+    if mutating and not confirm_live and not dry_run:
         raise SystemExit(
             f"Refusing live mutating request for {endpoint_key}. "
             "Use --confirm-live to send, or --dry-run to preview."
@@ -254,8 +380,17 @@ def execute_endpoint(
             "query": query,
             "body": body,
         }
+        if mutating:
+            token_path = _write_proof_token(endpoint_key, query, body)
+            preview["proof_token"] = token_path
+            preview["proof_ttl_seconds"] = _PROOF_TOKEN_TTL
         output_json(preview, pretty)
         return 0
+
+    # Gate: live mutating requests REQUIRE a prior dry-run proof token
+    token_path = None
+    if mutating and confirm_live:
+        token_path = _require_proof_token(endpoint_key, query, body)
 
     resp = client.send(prepared)
     payload = {
@@ -267,6 +402,11 @@ def execute_endpoint(
         "result": resp.get("data") if resp.get("ok") else resp.get("error"),
     }
     output_json(payload, pretty)
+
+    # Consume token only after successful execution (failed = can retry)
+    if token_path and resp.get("ok"):
+        token_path.unlink(missing_ok=True)
+
     return 0 if resp.get("ok") else 1
 
 
@@ -317,6 +457,66 @@ def cmd_ticker(args: argparse.Namespace, client: WeexSpotClient) -> int:
         client=client,
         endpoint_key=find_endpoint_key_by_doc_suffix("GetTickerInfo"),
         query={"symbol": normalize_spot_symbol(args.symbol)},
+        body={},
+        dry_run=False,
+        confirm_live=False,
+        pretty=args.pretty,
+    )
+
+
+def cmd_balance(args: argparse.Namespace, client: WeexSpotClient) -> int:
+    return execute_endpoint(
+        client=client,
+        endpoint_key="spot.account.get_account_balance",
+        query={},
+        body={},
+        dry_run=False,
+        confirm_live=False,
+        pretty=args.pretty,
+    )
+
+
+def cmd_depth(args: argparse.Namespace, client: WeexSpotClient) -> int:
+    q: Dict[str, Any] = {"symbol": normalize_spot_symbol(args.symbol)}
+    if args.limit:
+        q["limit"] = str(args.limit)
+    return execute_endpoint(
+        client=client,
+        endpoint_key="spot.market.get_depth_data",
+        query=q,
+        body={},
+        dry_run=False,
+        confirm_live=False,
+        pretty=args.pretty,
+    )
+
+
+def cmd_klines(args: argparse.Namespace, client: WeexSpotClient) -> int:
+    q: Dict[str, Any] = {
+        "symbol": normalize_spot_symbol(args.symbol),
+        "interval": args.interval,
+    }
+    if args.limit:
+        q["limit"] = str(args.limit)
+    return execute_endpoint(
+        client=client,
+        endpoint_key="spot.market.get_k_line_data",
+        query=q,
+        body={},
+        dry_run=False,
+        confirm_live=False,
+        pretty=args.pretty,
+    )
+
+
+def cmd_trades(args: argparse.Namespace, client: WeexSpotClient) -> int:
+    q: Dict[str, Any] = {"symbol": normalize_spot_symbol(args.symbol)}
+    if args.limit:
+        q["limit"] = str(args.limit)
+    return execute_endpoint(
+        client=client,
+        endpoint_key="spot.market.get_trade_data",
+        query=q,
         body={},
         dry_run=False,
         confirm_live=False,
@@ -383,6 +583,25 @@ def build_parser() -> argparse.ArgumentParser:
     p_ticker.add_argument("--symbol", required=True)
     p_ticker.add_argument("--pretty", action="store_true")
 
+    p_balance = sub.add_parser("balance", help="Get spot account balance")
+    p_balance.add_argument("--pretty", action="store_true")
+
+    p_depth = sub.add_parser("depth", help="Get order book depth for a symbol")
+    p_depth.add_argument("--symbol", required=True)
+    p_depth.add_argument("--limit", type=int, default=15, choices=[15, 200], help="Depth entries: 15 or 200")
+    p_depth.add_argument("--pretty", action="store_true")
+
+    p_klines = sub.add_parser("klines", help="Get K-line/candlestick data")
+    p_klines.add_argument("--symbol", required=True)
+    p_klines.add_argument("--interval", required=True, choices=["1m", "5m", "15m", "30m", "1h", "2h", "4h", "6h", "8h", "12h", "1d", "1w", "1M"])
+    p_klines.add_argument("--limit", type=int, default=None)
+    p_klines.add_argument("--pretty", action="store_true")
+
+    p_trades = sub.add_parser("trades", help="Get recent trades")
+    p_trades.add_argument("--symbol", required=True)
+    p_trades.add_argument("--limit", type=int, default=None)
+    p_trades.add_argument("--pretty", action="store_true")
+
     p_place = sub.add_parser("place-order", help="Convenience wrapper for the live spot PlaceOrder doc")
     p_place.add_argument("--symbol", required=True)
     p_place.add_argument("--side", required=True, choices=["BUY", "SELL", "buy", "sell"])
@@ -415,6 +634,14 @@ def main() -> int:
         return cmd_call(args, client)
     if args.command == "ticker":
         return cmd_ticker(args, client)
+    if args.command == "balance":
+        return cmd_balance(args, client)
+    if args.command == "depth":
+        return cmd_depth(args, client)
+    if args.command == "klines":
+        return cmd_klines(args, client)
+    if args.command == "trades":
+        return cmd_trades(args, client)
     if args.command == "place-order":
         return cmd_place_order(args, client)
     return 1
