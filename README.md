@@ -26,7 +26,7 @@ Trade futures & spot on WEEX exchange, analyze crypto markets, and manage your p
 ### 1. Install in Claude Code
 
 ```bash
-claude skill add --url https://github.com/drgnchan/weex-trader-skill
+claude skill add --url https://github.com/HorizonGazer/weex-trader-skill
 ```
 
 ### 2. Install in Codex / Openclaw
@@ -34,7 +34,7 @@ claude skill add --url https://github.com/drgnchan/weex-trader-skill
 Say to your agent:
 
 ```
-Help me install this skill: https://github.com/drgnchan/weex-trader-skill
+Help me install this skill: https://github.com/HorizonGazer/weex-trader-skill
 ```
 
 ### 3. Set Up API Credentials (for trading)
@@ -214,8 +214,8 @@ weex-trader-skill/
 
 | Platform | Install Method |
 |----------|---------------|
-| **Claude Code** | `claude skill add --url https://github.com/drgnchan/weex-trader-skill` |
-| **Codex** | Natural language: "Install this skill: https://github.com/drgnchan/weex-trader-skill" |
+| **Claude Code** | `claude skill add --url https://github.com/HorizonGazer/weex-trader-skill` |
+| **Codex** | Natural language: "Install this skill: https://github.com/HorizonGazer/weex-trader-skill" |
 | **Openclaw** | Search "weex-trader-skill" in marketplace |
 
 ---
@@ -246,8 +246,8 @@ python scripts/generate_weex_api_definitions.py --product all
 ### Self-Update
 
 ```bash
-python scripts/skill_update.py check --repo drgnchan/weex-trader-skill
-python scripts/skill_update.py update --repo drgnchan/weex-trader-skill
+python scripts/skill_update.py check --repo HorizonGazer/weex-trader-skill
+python scripts/skill_update.py update --repo HorizonGazer/weex-trader-skill
 ```
 
 ### Generic Endpoint Call
@@ -278,7 +278,7 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 
 | Problem | Solution |
 |---------|----------|
-| Skill not found | Reinstall: `claude skill add --url https://github.com/drgnchan/weex-trader-skill` |
+| Skill not found | Reinstall: `claude skill add --url https://github.com/HorizonGazer/weex-trader-skill` |
 | Authentication error | Verify `WEEX_API_KEY`, `WEEX_API_SECRET`, `WEEX_API_PASSPHRASE` in `.env` or shell |
 | Order rejected | Check account balance, API key permissions, and symbol availability |
 | `--confirm-live` rejected | Run `--dry-run` first to generate proof token, then retry within 5 minutes |
@@ -310,7 +310,11 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 
 ## 📄 License
 
-[MIT](LICENSE) © 2026 [drgnchan](https://github.com/drgnchan)
+[MIT](LICENSE) © 2026 [HorizonGazer](https://github.com/HorizonGazer)
+
+## 🙏 Acknowledgments
+
+- [drgnchan](https://github.com/drgnchan/weex-trader-skill) — Original WEEX Trader Skill creator, V3 API wrappers & skill architecture
 
 ---
 
