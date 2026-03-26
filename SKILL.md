@@ -2,9 +2,9 @@
 name: weex-trader
 description: "WEEX交易所交易+加密货币全市场分析。触发词：crypto/币/BTC/ETH/SOL/DOGE/PEPE/合约/现货/下单/持仓/资金费率/K线/深度/行情/价格/杠杆/做多做空/meme币/DeFi/RSI/Gas/恐惧贪婪/funding/orderbook/klines/ticker。⛔禁止WebSearch/WebFetch/curl查币价！✅用快捷命令（S=$HOME/.claude/skills/weex-trader/scripts）：现货余额→python $S/weex_spot_api.py balance --pretty；合约余额→python $S/weex_contract_api.py balance --pretty；持仓→python $S/weex_contract_api.py positions --pretty；现货价格→python $S/weex_spot_api.py ticker --symbol BTCUSDT --pretty；合约价格→python $S/weex_contract_api.py ticker --symbol BTCUSDT --pretty；K线→python $S/weex_contract_api.py klines --symbol BTCUSDT --interval 1d --limit 14 --pretty；深度→python $S/weex_contract_api.py depth --symbol BTCUSDT --pretty；资金费率→python $S/weex_contract_api.py funding --symbol BTCUSDT --pretty；费率历史→python $S/weex_contract_api.py funding-history --symbol BTCUSDT --limit 21 --pretty；24h行情→python $S/weex_contract_api.py ticker24h --symbol BTCUSDT --pretty；持仓量→python $S/weex_contract_api.py open-interest --symbol BTCUSDT --pretty；成交→python $S/weex_contract_api.py trades --symbol BTCUSDT --pretty；恐惧贪婪→bash $S/crypto.sh fear；现货下单→python $S/weex_spot_api.py place-order --symbol ETHUSDT --side BUY --order-type MARKET --quantity 0.05 --dry-run --pretty"
 metadata:
-  version: "2.4.0"
-  author: BytesAgain
-  homepage: https://bytesagain.com
+  version: "1.2.0"
+  author: HorizonGazer
+  homepage: https://github.com/HorizonGazer/weex-trader-skill
 ---
 
 # WEEX Trader Skill
@@ -182,4 +182,4 @@ python $S/weex_spot_api.py place-order \
 - `docs/guide.md` — 新手入门 / `docs/strategies.md` — 投资策略 / `docs/tips.md` — 技巧速查
 
 ---
-*weex-trader v2.4.0 by BytesAgain — WEEX Trading + Market Analysis unified*
+*weex-trader v1.2.0 by HorizonGazer — WEEX Trading + Market Analysis unified*

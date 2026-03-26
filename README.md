@@ -3,7 +3,7 @@
 > AI-powered crypto trading & market analysis for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) / [Codex](https://openai.com/codex) / [Openclaw](https://openclaw.com)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/version-2.4.0-green.svg)](#changelog)
+[![Version](https://img.shields.io/badge/version-1.2.0-green.svg)](#changelog)
 [![WEEX API](https://img.shields.io/badge/WEEX-V3_API-orange.svg)](https://www.weex.com)
 [![Safety](https://img.shields.io/badge/Trade_Safety-Proof_Token-red.svg)](#-innovation-1-proof-token-trade-safety)
 
@@ -339,24 +339,21 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 
 ## 📜 Changelog
 
-### v2.4.0 (2026-03-27) — Proof Token Safety
+### v1.2.0 (2026-03-27) — Proof Token Safety
 - 🔒 **Code-enforced two-step trade verification** with proof tokens (SHA-256 fingerprint)
 - Scripts reject `--confirm-live` without prior `--dry-run` at code level
 - Proof tokens: single-use, 5-minute TTL, tamper-proof
 
-### v2.3.0 — Anti-Hallucination
+### v1.1.0 — Anti-Hallucination
 - 🧠 Replaced `call --endpoint` with 13 shortcut commands in SKILL.md description
 - ⚠️ Added common mistakes reference table (8 frequent agent errors)
 - 🛡️ Introduced `--dry-run` → user confirm → `--confirm-live` safety flow
 
-### v2.2.0 — Multi-Source Intelligence
+### v1.0.0 — Multi-Source Intelligence
 - 🌐 Added `crypto.sh` for multi-source market analysis (CoinGecko, DefiLlama, Alternative.me)
 - 📊 RSI, Moving Averages, DeFi TVL, Fear & Greed, Gas tracker
 - 📖 Added `docs/`: beginner guide, investment strategies, quick tips
-
-### v1.6.0 — *Original by drgnchan*
-- ✅ WEEX V3 API support (spot + futures)
-- 📦 Self-update system via GitHub Releases
+- 🍴 Forked from [drgnchan/weex-trader-skill](https://github.com/drgnchan/weex-trader-skill) v1.6.0 (WEEX V3 API, spot + futures)
 
 ---
 
