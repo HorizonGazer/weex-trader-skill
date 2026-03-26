@@ -340,7 +340,7 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 ## 📜 Changelog
 
 ### v1.0.0 (2026-03-27)
-- 🍴 Forked from [drgnchan/weex-trader-skill](https://github.com/drgnchan/weex-trader-skill) v1.6.0
+- 🍴 Forked from [drgnchan/weex-trader-skill](https://github.com/drgnchan/weex-trader-skill)
 - 🔒 **Proof Token Safety** — Code-enforced two-step trade verification (SHA-256 fingerprint, 5-min TTL, single-use)
 - 🧠 **Anti-Hallucination** — 13 shortcut commands in description, 8-entry common mistakes table, hard constraints
 - 🌐 **Multi-Source Intelligence** — `crypto.sh` with 15 commands aggregating WEEX + CoinGecko + DefiLlama + Alternative.me
