@@ -352,15 +352,3 @@ python $S/weex_contract_api.py call --endpoint market.xxx --query '{"key":"value
 ## 📄 License
 
 [MIT](LICENSE) © 2026 [HorizonGazer](https://github.com/HorizonGazer)
-
-## 👥 Contributors
-
-1. **[HorizonGazer](https://github.com/HorizonGazer)** — Proof token safety system, anti-hallucination agent engineering, multi-source market analysis CLI, docs & strategy guides
-2. **[drgnchan](https://github.com/drgnchan)** — Original skill creator, WEEX V3 API wrappers & skill architecture
-
----
-
-<p align="center">
-  Built with ❤️ for the crypto trading community<br>
-  <strong>WEEX Trader Skill</strong> — Trade smarter, trade safer
-</p>
